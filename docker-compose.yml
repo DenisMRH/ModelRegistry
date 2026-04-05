@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: model-registry-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: model_registry_user
+      POSTGRES_PASSWORD: model_registry_password
+      POSTGRES_DB: model_registry
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  s3:
+    image: minio/minio
+    container_name: model-registry-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadminpassword
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: model-registry-api
+    restart: unless-stopped
+    depends_on:
+      - db
+      - s3
+    environment:
+      DATABASE_URL: postgresql+asyncpg://model_registry_user:model_registry_password@db:5432/model_registry
+      S3_ENDPOINT_URL: http://s3:9000
+      S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadminpassword
+    ports:
+      - "8000:8000"
+
+volumes:
+  db_data:
+  minio_data:
+
